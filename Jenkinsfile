@@ -1,14 +1,20 @@
 pipeline {
     agent any
 
+    environment {
+        ALLURE_RESULTS = 'Allure/allure-results'
+        ALLURE_REPORT  = 'allure-report'
+        PDF_NAME       = 'Allure-Report.pdf'
+    }
+
     stages {
 
         stage('Build & Test') {
             steps {
-                bat '''
-                    echo ================================
-                    echo BUILD AND TEST
-                    echo ================================
+                sh '''
+                    echo "================================"
+                    echo "BUILD AND TEST"
+                    echo "================================"
 
                     mvn clean test
                 '''
@@ -20,103 +26,43 @@ pipeline {
                 echo 'Publishing Allure report...'
 
                 allure([
-                    results: [[path: 'Allure/allure-results']]
+                    results: [[path: "${ALLURE_RESULTS}"]]
                 ])
             }
         }
 
-        stage('Generate Allure HTML') {
+        stage('Generate Allure Report to PDF') {
             steps {
-                bat '''
-                    echo ================================
-                    echo GENERATING ALLURE HTML REPORT
-                    echo ================================
+                sh '''
+                    set -e
 
-                    if exist "Allure\\allure-report" (
-                        rmdir /s /q "Allure\\allure-report"
-                    )
+                    echo "================================"
+                    echo "GENERATING ALLURE PDF"
+                    echo "================================"
 
-                    allure generate "Allure\\allure-results" ^
-                        -o "Allure\\allure-report" ^
-                        --clean
+                    python3 -m venv .venv
+                    . .venv/bin/activate
 
-                    if not exist "Allure\\allure-report\\index.html" (
-                        echo ERROR: Allure HTML report was not generated.
-                        exit /b 1
-                    )
+                    pip install --quiet --upgrade pip
+                    pip install --quiet allure-combine
 
-                    echo Allure HTML report generated successfully.
+                    allure-combine \
+                        "$ALLURE_REPORT" \
+                        --dest "$ALLURE_REPORT"
 
-                    dir "Allure\\allure-report"
-                '''
-            }
-        }
+                    google-chrome \
+                        --headless=new \
+                        --no-sandbox \
+                        --disable-gpu \
+                        --disable-dev-shm-usage \
+                        --hide-scrollbars \
+                        --virtual-time-budget=20000 \
+                        --run-all-compositor-stages-before-draw \
+                        --no-pdf-header-footer \
+                        --print-to-pdf="$WORKSPACE/$PDF_NAME" \
+                        "file://$WORKSPACE/$ALLURE_REPORT/complete.html"
 
-        stage('Generate Allure PDF') {
-            steps {
-                bat '''
-                    echo ================================
-                    echo STARTING JAVA HTTP SERVER
-                    echo ================================
-
-                    cd Allure
-
-                    start "" /B java -cp "%JAVA_HOME%\\lib\\tools.jar" com.sun.net.httpserver.SimpleFileServer 8000
-
-                    cd ..
-
-                    timeout /t 5 /nobreak >nul
-
-                    echo ================================
-                    echo CHECKING GOOGLE CHROME
-                    echo ================================
-
-                    set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-
-                    if not exist "%CHROME%" (
-                        set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-                    )
-
-                    if not exist "%CHROME%" (
-                        echo ERROR: Google Chrome was not found.
-                        exit /b 1
-                    )
-
-                    echo Chrome found:
-                    echo %CHROME%
-
-                    echo ================================
-                    echo GENERATING PDF
-                    echo ================================
-
-                    if exist "Allure-Report.pdf" (
-                        del /f /q "Allure-Report.pdf"
-                    )
-
-                    "%CHROME%" ^
-                        --headless=new ^
-                        --disable-gpu ^
-                        --no-sandbox ^
-                        --disable-dev-shm-usage ^
-                        --no-first-run ^
-                        --no-default-browser-check ^
-                        --print-to-pdf="%WORKSPACE%\\Allure-Report.pdf" ^
-                        "http://127.0.0.1:8000/allure-report/index.html"
-
-                    timeout /t 5 /nobreak >nul
-
-                    if not exist "%WORKSPACE%\\Allure-Report.pdf" (
-                        echo ERROR: Allure PDF was not generated.
-                        exit /b 1
-                    )
-
-                    echo ================================
-                    echo PDF GENERATED SUCCESSFULLY
-                    echo ================================
-
-                    dir "%WORKSPACE%\\Allure-Report.pdf"
-
-                    taskkill /IM chrome.exe /F >nul 2>&1
+                    ls -lh "$WORKSPACE/$PDF_NAME"
                 '''
             }
         }
@@ -125,6 +71,19 @@ pipeline {
     post {
 
         always {
+            echo 'Publishing Allure results...'
+
+            allure(
+                includeProperties: false,
+                jdk: '',
+                results: [[path: "${ALLURE_RESULTS}"]]
+            )
+
+            archiveArtifacts(
+                artifacts: "${PDF_NAME}",
+                allowEmptyArchive: true
+            )
+
             echo 'CI/CD execution completed'
 
             emailext(
@@ -135,9 +94,9 @@ Hi Team,
 
 The CI/CD pipeline execution has completed.
 
-Project       : Pipeline1
-Build Number  : #${env.BUILD_NUMBER}
-Build Status  : ${currentBuild.currentResult}
+Project        : Pipeline1
+Build Number   : #${env.BUILD_NUMBER}
+Build Status   : ${currentBuild.currentResult}
 
 Test Execution : Completed
 Allure Report  : PDF attached
@@ -148,7 +107,7 @@ Please find the Allure test report PDF attached for detailed test results.
 Regards,
 Automation Team
                 """,
-                attachmentsPattern: 'Allure-Report.pdf',
+                attachmentsPattern: "${PDF_NAME}",
                 attachLog: true
             )
         }
