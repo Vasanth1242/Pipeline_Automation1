@@ -1,3 +1,5 @@
+pipeline {
+    agent any
 environment {
     ALLURE_RESULTS = 'Allure/allure-results'
     ALLURE_REPORT = 'allure-report'
