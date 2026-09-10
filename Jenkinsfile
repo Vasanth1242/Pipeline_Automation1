@@ -54,7 +54,7 @@ pipeline {
 				WebAutomation Test
 									"""
 				
-				attachmentsPattern: 'Allure-report.zip,build.log',
+				attachmentsPattern: 'Allure-report.zip,build',
 				attachLog: true
 			)
 		}
