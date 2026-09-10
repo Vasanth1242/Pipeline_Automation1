@@ -21,6 +21,13 @@ pipeline {
 	post {
 		always {
 			echo 'Test execution completed'
+			
+			emailext(
+				to: 'vasanthvj.kiaq@gmail.com',
+				subject: "Jenkins Build ${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
+				body: "CI/CD execution completed. status: ${currentBuild.currentResult}",
+				attachLog: true
+			)
 		}
 		
 		success {
