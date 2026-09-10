@@ -6,7 +6,6 @@ pipeline {
 			steps {
 				bat 'mvn clean test'
 			//	bat 'mvn clean test -Dsurefire.suiteXmlFiles=testng.xml'
-			// run
 			}
 		}
 		stage('Allure Report'){
@@ -17,15 +16,45 @@ pipeline {
 			}
 		}
 	}
+	stage('prepare Allure Report'){
+		steps{
+			bat '''
+			if exist Allure-Report.zip del /f /q Allure-Report.zip
+			powershell -command "Compress-Archive -path 'Allure\\allure-results\\* -Destinationpath 'Allure-Report.zip' -Force"
+			'''
+		}
+	}
+	
 	
 	post {
 		always {
-			echo 'Test execution completed'
+			echo 'CI/CD execution completed'
 			
 			emailext(
 				to: 'vasanthvj.kiaq@gmail.com',
-				subject: "Jenkins Build ${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
-				body: "CI/CD execution completed. status: ${currentBuild.currentResult}",
+				subject: "[CI/CD] Pipeline1 - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
+				body: """
+				
+				Hi Team,
+				
+				The Ci/CD pipeline execution has completed.
+				
+				Project : Pipeline1
+				Build Number: #${env.BUILD_NUMBER}
+				Build Status: ${currentBuild.currentResult}
+				
+				Test Execution: completed
+				
+				Allure Report : Attached
+				Build Log: Attached
+				
+				Please check the attached files for detailed execution information.
+				
+				Regards,
+				WebAutomation Test
+									"""
+				
+				attachmentsPattern: 'Allure-report.zip,build.log',
 				attachLog: true
 			)
 		}
