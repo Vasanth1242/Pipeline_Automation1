@@ -9,6 +9,13 @@ pipeline {
 			// run
 			}
 		}
+		stage('Allure Report'){
+			steps{
+				allure([
+					results: [[path: 'Allure/allure-results']]
+				])
+			}
+		}
 	}
 	
 	post {
