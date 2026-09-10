@@ -59,7 +59,7 @@ pipeline {
             echo 'CI/CD execution completed'
 
             emailext(
-                to: 'YOUR_GMAIL_ADDRESS@gmail.com',
+                to: 'vasanthvj.kiaq@gmail.com',
                 subject: "[CI/CD] Pipeline1 - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
                 body: """
 Hi Team,
