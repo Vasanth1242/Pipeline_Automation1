@@ -5,49 +5,118 @@ pipeline {
 
         stage('Build & Test') {
             steps {
-                bat 'mvn clean test'
+                bat '''
+                    echo ================================
+                    echo BUILD AND TEST
+                    echo ================================
+
+                    mvn clean test
+                '''
             }
         }
 
         stage('Allure Report') {
             steps {
+                echo 'Publishing Allure report...'
+
                 allure([
                     results: [[path: 'Allure/allure-results']]
                 ])
             }
         }
 
+        stage('Generate Allure HTML') {
+            steps {
+                bat '''
+                    echo ================================
+                    echo GENERATING ALLURE HTML REPORT
+                    echo ================================
+
+                    if exist "Allure\\allure-report" (
+                        rmdir /s /q "Allure\\allure-report"
+                    )
+
+                    allure generate "Allure\\allure-results" ^
+                        -o "Allure\\allure-report" ^
+                        --clean
+
+                    if not exist "Allure\\allure-report\\index.html" (
+                        echo ERROR: Allure HTML report was not generated.
+                        exit /b 1
+                    )
+
+                    echo Allure HTML report generated successfully.
+
+                    dir "Allure\\allure-report"
+                '''
+            }
+        }
+
         stage('Generate Allure PDF') {
             steps {
                 bat '''
-                    echo Generating Allure HTML report...
+                    echo ================================
+                    echo STARTING JAVA HTTP SERVER
+                    echo ================================
 
-                    if exist "Allure\\allure-report" rmdir /s /q "Allure\\allure-report"
+                    cd Allure
 
-                    allure generate "Allure\\allure-results" -o "Allure\\allure-report" --clean
+                    start "" /B java -cp "%JAVA_HOME%\\lib\\tools.jar" com.sun.net.httpserver.SimpleFileServer 8000
 
-                    echo Starting local web server...
+                    cd ..
 
-                    start /B python -m http.server 8000 --directory "Allure\\allure-report"
+                    timeout /t 5 /nobreak >nul
 
-                    timeout /t 5 /nobreak
+                    echo ================================
+                    echo CHECKING GOOGLE CHROME
+                    echo ================================
 
-                    echo Generating PDF...
+                    set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 
-                    if exist "Allure-Report.pdf" del /f /q "Allure-Report.pdf"
+                    if not exist "%CHROME%" (
+                        set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                    )
 
-                    set "EDGE=C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+                    if not exist "%CHROME%" (
+                        echo ERROR: Google Chrome was not found.
+                        exit /b 1
+                    )
 
-                    if not exist "%EDGE%" set "EDGE=C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"
+                    echo Chrome found:
+                    echo %CHROME%
 
-                    "%EDGE%" --headless --disable-gpu --no-sandbox --print-to-pdf="%WORKSPACE%\\Allure-Report.pdf" http://localhost:8000/index.html
+                    echo ================================
+                    echo GENERATING PDF
+                    echo ================================
 
-                    timeout /t 5 /nobreak
+                    if exist "Allure-Report.pdf" (
+                        del /f /q "Allure-Report.pdf"
+                    )
 
-                    echo Allure PDF generated.
+                    "%CHROME%" ^
+                        --headless=new ^
+                        --disable-gpu ^
+                        --no-sandbox ^
+                        --disable-dev-shm-usage ^
+                        --no-first-run ^
+                        --no-default-browser-check ^
+                        --print-to-pdf="%WORKSPACE%\\Allure-Report.pdf" ^
+                        "http://127.0.0.1:8000/allure-report/index.html"
 
-                    taskkill /IM msedge.exe /F >nul 2>&1
-                    taskkill /IM python.exe /F >nul 2>&1
+                    timeout /t 5 /nobreak >nul
+
+                    if not exist "%WORKSPACE%\\Allure-Report.pdf" (
+                        echo ERROR: Allure PDF was not generated.
+                        exit /b 1
+                    )
+
+                    echo ================================
+                    echo PDF GENERATED SUCCESSFULLY
+                    echo ================================
+
+                    dir "%WORKSPACE%\\Allure-Report.pdf"
+
+                    taskkill /IM chrome.exe /F >nul 2>&1
                 '''
             }
         }
@@ -66,13 +135,13 @@ Hi Team,
 
 The CI/CD pipeline execution has completed.
 
-Project : Pipeline1
-Build Number : #${env.BUILD_NUMBER}
-Build Status : ${currentBuild.currentResult}
+Project       : Pipeline1
+Build Number  : #${env.BUILD_NUMBER}
+Build Status  : ${currentBuild.currentResult}
 
 Test Execution : Completed
-Allure Report : PDF attached
-Build Log : Attached
+Allure Report  : PDF attached
+Build Log      : Attached
 
 Please find the Allure test report PDF attached for detailed test results.
 
