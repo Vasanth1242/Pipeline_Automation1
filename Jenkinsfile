@@ -1,5 +1,6 @@
 pipeline {
-    agent any
+agent any
+
 environment {
     ALLURE_RESULTS = 'Allure/allure-results'
     ALLURE_REPORT = 'allure-report'
@@ -32,61 +33,79 @@ stages {
         }
     }
 
-    stage('Generate Allure Report to PDF') {
+    stage('Check Allure Report') {
         steps {
             bat '''
                 echo ================================
-                echo GENERATING ALLURE PDF
+                echo CHECKING ALLURE REPORT
                 echo ================================
 
                 if not exist "%ALLURE_REPORT%" (
-                    echo ERROR: Allure report directory not found
+                    echo ERROR: Allure report directory does not exist
                     exit /b 1
                 )
 
-                if not exist "%ALLURE_REPORT%\\complete.html" (
-                    echo ERROR: complete.html not found
-                    dir "%ALLURE_REPORT%"
-                    exit /b 1
-                )
+                echo Allure report directory found.
+                echo.
 
-                echo Allure report found.
-                echo Generating PDF...
+                dir "%ALLURE_REPORT%" /s /b
+            '''
+        }
+    }
+
+    stage('Generate PDF') {
+        steps {
+            bat '''
+                echo ================================
+                echo GENERATING PDF
+                echo ================================
+
+                set "CHROME="
 
                 if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
-                    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" ^
-                        --headless=new ^
-                        --no-sandbox ^
-                        --disable-gpu ^
-                        --disable-dev-shm-usage ^
-                        --hide-scrollbars ^
-                        --virtual-time-budget=20000 ^
-                        --run-all-compositor-stages-before-draw ^
-                        --no-pdf-header-footer ^
-                        --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
-                        "file:///%WORKSPACE%/%ALLURE_REPORT%/complete.html"
-                ) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
-                    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" ^
-                        --headless=new ^
-                        --no-sandbox ^
-                        --disable-gpu ^
-                        --disable-dev-shm-usage ^
-                        --hide-scrollbars ^
-                        --virtual-time-budget=20000 ^
-                        --run-all-compositor-stages-before-draw ^
-                        --no-pdf-header-footer ^
-                        --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
-                        "file:///%WORKSPACE%/%ALLURE_REPORT%/complete.html"
-                ) else (
+                    set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+                )
+
+                if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
+                    set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                )
+
+                if "%CHROME%"=="" (
                     echo ERROR: Google Chrome was not found
                     exit /b 1
                 )
+
+                echo Chrome found:
+                echo %CHROME%
+                echo.
+
+                if exist "%ALLURE_REPORT%\\index.html" (
+                    set "REPORT_FILE=index.html"
+                ) else if exist "%ALLURE_REPORT%\\complete.html" (
+                    set "REPORT_FILE=complete.html"
+                ) else (
+                    echo ERROR: No Allure HTML entry file found
+                    exit /b 1
+                )
+
+                echo Report file:
+                echo %REPORT_FILE%
+                echo.
+
+                "%CHROME%" ^
+                    --headless=new ^
+                    --no-sandbox ^
+                    --disable-gpu ^
+                    --disable-dev-shm-usage ^
+                    --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
+                    "file:///%WORKSPACE%/%ALLURE_REPORT%/%REPORT_FILE%"
 
                 if not exist "%WORKSPACE%\\%PDF_NAME%" (
                     echo ERROR: PDF was not generated
                     exit /b 1
                 )
 
+                echo.
                 echo ================================
                 echo PDF GENERATED SUCCESSFULLY
                 echo ================================
@@ -111,6 +130,8 @@ post {
             to: 'vasanthvj.kiaq@gmail.com',
             subject: "[CI/CD] Pipeline1 - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
             body: """
+
+
 Hi Team,
 
 The CI/CD pipeline execution has completed.
@@ -140,4 +161,7 @@ attachLog: true
     failure {
         echo 'Build or tests failed'
     }
+}
+
+
 }
