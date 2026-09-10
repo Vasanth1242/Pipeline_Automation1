@@ -56,7 +56,7 @@ public class LoginStep {
 			System.out.println("Allure report + email validation");
 		} else if (result.equalsIgnoreCase("Invalid")) {
 			Assert.assertTrue(loginPage.isErrorMessageDisplayed(),
-					"Expected error message, but error message was not displayed");
+					"Expected error message, but error, message was not displayed");
 			System.out.println("Login failed as expected");
 		}
 	}
