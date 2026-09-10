@@ -53,7 +53,7 @@ public class LoginStep {
 		if (result.equalsIgnoreCase("Valid")) {
 			Assert.assertTrue(driver.getCurrentUrl().contains("inventory"), "User is not on the product page");
 			System.out.println("Login successfully");
-			System.out.println("Allure report + email");
+			System.out.println("Allure report + email validation");
 		} else if (result.equalsIgnoreCase("Invalid")) {
 			Assert.assertTrue(loginPage.isErrorMessageDisplayed(),
 					"Expected error message, but error message was not displayed");
