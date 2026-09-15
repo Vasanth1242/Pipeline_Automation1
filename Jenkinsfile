@@ -98,73 +98,70 @@ pipeline {
         // ============================================================
         // 6. GENERATE ALLURE PDF
         // ============================================================
-        stage('Generate PDF') {
-            steps {
-                bat '''
-                    set "CHROME="
+       stage('Generate PDF') {
+    steps {
+        bat '''
+            set "CHROME="
 
-                    if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
-                        set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-                    ) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
-                        set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-                    )
+            if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
+                set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+            ) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
+                set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+            )
 
-                    if "%CHROME%"=="" (
-                        echo ERROR: Google Chrome not found.
-                        exit /b 1
-                    )
+            if "%CHROME%"=="" (
+                echo ERROR: Google Chrome not found.
+                exit /b 1
+            )
 
-                    echo Generating Allure HTML report...
+            if not exist "%ALLURE_REPORT%\\index.html" (
+                echo ERROR: Allure report was not generated.
+                exit /b 1
+            )
 
-                    allure generate "%ALLURE_RESULTS%" ^
-                        -o "%ALLURE_REPORT%" ^
-                        --clean
+            echo Allure report is ready.
+            echo Waiting for report files to settle...
 
-                    if errorlevel 1 (
-                        echo ERROR: Allure report generation failed.
-                        exit /b 1
-                    )
+            timeout /t 3 /nobreak >nul
 
-                    if not exist "%ALLURE_REPORT%\\index.html" (
-                        echo ERROR: Allure index.html not found.
-                        exit /b 1
-                    )
+            if exist "%PDF_NAME%" (
+                del /f /q "%PDF_NAME%"
+            )
 
-                    echo Allure report generated.
+            echo Generating Allure PDF...
 
-                    timeout /t 3 /nobreak >nul
+            "%CHROME%" ^
+                --headless=new ^
+                --no-sandbox ^
+                --disable-gpu ^
+                --disable-dev-shm-usage ^
+                --allow-file-access-from-files ^
+                --disable-web-security ^
+                --disable-extensions ^
+                --no-first-run ^
+                --no-default-browser-check ^
+                --virtual-time-budget=60000 ^
+                --run-all-compositor-stages-before-draw ^
+                --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
+                "file:///%WORKSPACE%/%ALLURE_REPORT%/index.html"
 
-                    echo Generating PDF...
+            if errorlevel 1 (
+                echo ERROR: Chrome PDF generation failed.
+                exit /b 1
+            )
 
-                    "%CHROME%" ^
-                        --headless=new ^
-                        --no-sandbox ^
-                        --disable-gpu ^
-                        --disable-dev-shm-usage ^
-                        --allow-file-access-from-files ^
-                        --disable-web-security ^
-                        --disable-extensions ^
-                        --no-first-run ^
-                        --no-default-browser-check ^
-                        --virtual-time-budget=60000 ^
-                        --run-all-compositor-stages-before-draw ^
-                        --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
-                        "file:///%WORKSPACE%/%ALLURE_REPORT%/index.html"
+            if not exist "%PDF_NAME%" (
+                echo ERROR: Allure PDF was not generated.
+                exit /b 1
+            )
 
-                    if errorlevel 1 (
-                        echo ERROR: Chrome PDF generation failed.
-                        exit /b 1
-                    )
-
-                    if not exist "%PDF_NAME%" (
-                        echo ERROR: PDF was not generated.
-                        exit /b 1
-                    )
-
-                    echo Allure PDF generated successfully.
-                '''
-            }
-        }
+            echo Allure PDF generated successfully.
+            dir "%PDF_NAME%"
+        '''
+    }
+}
+             
+      
 
 
         // ============================================================
