@@ -17,152 +17,79 @@ pipeline {
     stages {
 
         // ============================================================
-        // 1. BUILD AND TEST
+        // 1. CLEAN PREVIOUS RESULTS
+        // ============================================================
+        stage('Clean') {
+            steps {
+                bat '''
+                    if exist "%ALLURE_RESULTS%" rmdir /s /q "%ALLURE_RESULTS%"
+                    if exist "%ALLURE_REPORT%" rmdir /s /q "%ALLURE_REPORT%"
+                    if exist "%PDF_NAME%" del /f /q "%PDF_NAME%"
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 2. BUILD & TEST
         // ============================================================
         stage('Build & Test') {
             steps {
-                bat '''
-                    echo ========================================
-                    echo BUILD AND TEST
-                    echo ========================================
-
-                    mvn clean test
-
-                    if errorlevel 1 (
-                        echo.
-                        echo ERROR: Maven test execution failed
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo Maven test execution completed.
-                '''
+                bat 'mvn clean test'
             }
         }
 
 
         // ============================================================
-        // 2. CHECK ALLURE RESULTS
+        // 3. VERIFY ALLURE RESULTS
         // ============================================================
-        stage('Check Allure Results') {
+        stage('Verify Results') {
             steps {
                 bat '''
-                    echo ========================================
-                    echo CHECKING ALLURE RESULTS
-                    echo ========================================
-
                     if not exist "%ALLURE_RESULTS%" (
-                        echo ERROR: Allure results directory does not exist
-                        echo Expected:
-                        echo %WORKSPACE%\\%ALLURE_RESULTS%
+                        echo ERROR: Allure results directory not found.
                         exit /b 1
                     )
 
-                    echo Allure results directory found:
-                    echo %WORKSPACE%\\%ALLURE_RESULTS%
-                    echo.
+                    dir /b "%ALLURE_RESULTS%\\*.json" >nul 2>&1
 
-                    echo Allure result files:
-                    dir "%ALLURE_RESULTS%" /s /b
-
-                    echo.
-                    echo Checking JSON result files...
-
-                    dir /b "%ALLURE_RESULTS%\\*.json" > "%TEMP%\\allure_files.txt" 2>nul
-
-                    if not exist "%TEMP%\\allure_files.txt" (
-                        echo ERROR: No Allure JSON files found
-                        echo Allure report cannot be generated without result files.
+                    if errorlevel 1 (
+                        echo ERROR: No Allure JSON result files found.
                         exit /b 1
                     )
 
-                    for /f %%A in ('find /c /v "" ^< "%TEMP%\\allure_files.txt"') do (
-                        echo Allure JSON file count: %%A
-                    )
-
-                    del "%TEMP%\\allure_files.txt" 2>nul
-
-                    echo.
-                    echo Allure results are available.
+                    echo Allure results verified.
                 '''
             }
         }
 
 
         // ============================================================
-        // 3. GENERATE ALLURE REPORT
+        // 4. PUBLISH ALLURE REPORT IN JENKINS
         // ============================================================
         stage('Allure Report') {
             steps {
-                echo 'Generating Allure HTML report...'
-
                 allure(
                     includeProperties: false,
                     jdk: '',
                     results: [[path: "${ALLURE_RESULTS}"]]
                 )
-
-                echo 'Allure Jenkins report step completed.'
             }
         }
 
 
         // ============================================================
-        // 4. CHECK ALLURE REPORT
+        // 5. VERIFY CUCUMBER REPORT
         // ============================================================
-        stage('Check Allure Report') {
+        stage('Verify Cucumber') {
             steps {
                 bat '''
-                    echo ========================================
-                    echo CHECKING ALLURE REPORT
-                    echo ========================================
-
-                    if not exist "%ALLURE_REPORT%" (
-                        echo ERROR: Allure report directory does not exist
-                        exit /b 1
-                    )
-
-                    if not exist "%ALLURE_REPORT%\\index.html" (
-                        echo ERROR: Allure index.html does not exist
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo Allure report found successfully.
-                    echo Report:
-                    echo %WORKSPACE%\\%ALLURE_REPORT%\\index.html
-                    echo.
-
-                    echo Allure report files:
-                    dir "%ALLURE_REPORT%" /s /b
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // 5. CHECK CUCUMBER REPORT
-        // ============================================================
-        stage('Check Cucumber Report') {
-            steps {
-                bat '''
-                    echo ========================================
-                    echo CHECKING CUCUMBER REPORT
-                    echo ========================================
-
                     if not exist "%CUCUMBER_REPORT%" (
-                        echo ERROR: Cucumber HTML report was not found.
-                        echo Expected:
-                        echo %WORKSPACE%\\%CUCUMBER_REPORT%
+                        echo ERROR: Cucumber report not found.
                         exit /b 1
                     )
 
-                    echo.
-                    echo Cucumber report found successfully.
-                    echo %WORKSPACE%\\%CUCUMBER_REPORT%
-                    echo.
-
-                    dir "%CUCUMBER_REPORT%"
+                    echo Cucumber report verified.
                 '''
             }
         }
@@ -174,73 +101,40 @@ pipeline {
         stage('Generate PDF') {
             steps {
                 bat '''
-                    echo ========================================
-                    echo GENERATING ALLURE PDF
-                    echo ========================================
-
                     set "CHROME="
 
                     if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
                         set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-                    )
-
-                    if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
+                    ) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
                         set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
                     )
 
                     if "%CHROME%"=="" (
-                        echo ERROR: Google Chrome was not found
+                        echo ERROR: Google Chrome not found.
                         exit /b 1
                     )
 
-                    echo Chrome found:
-                    echo %CHROME%
-                    echo.
-
-
-                    // ------------------------------------------------
-                    // Generate a fresh Allure report
-                    // ------------------------------------------------
-                    echo Generating fresh Allure HTML report...
-
-                    if exist "%ALLURE_REPORT%" (
-                        echo Removing old Allure report...
-                        rmdir /s /q "%ALLURE_REPORT%"
-                    )
+                    echo Generating Allure HTML report...
 
                     allure generate "%ALLURE_RESULTS%" ^
                         -o "%ALLURE_REPORT%" ^
                         --clean
 
                     if errorlevel 1 (
-                        echo ERROR: Allure report generation failed
+                        echo ERROR: Allure report generation failed.
                         exit /b 1
                     )
 
                     if not exist "%ALLURE_REPORT%\\index.html" (
-                        echo ERROR: Allure index.html was not generated
+                        echo ERROR: Allure index.html not found.
                         exit /b 1
                     )
 
-                    echo.
-                    echo Allure HTML report generated successfully.
-                    echo.
+                    echo Allure report generated.
 
+                    timeout /t 3 /nobreak >nul
 
-                    // ------------------------------------------------
-                    // Remove old PDF
-                    // ------------------------------------------------
-                    if exist "%WORKSPACE%\\%PDF_NAME%" (
-                        echo Removing old PDF...
-                        del /f /q "%WORKSPACE%\\%PDF_NAME%"
-                    )
-
-
-                    // ------------------------------------------------
-                    // Generate PDF using Chrome
-                    // ------------------------------------------------
-                    echo Starting Chrome...
-                    echo.
+                    echo Generating PDF...
 
                     "%CHROME%" ^
                         --headless=new ^
@@ -249,71 +143,50 @@ pipeline {
                         --disable-dev-shm-usage ^
                         --allow-file-access-from-files ^
                         --disable-web-security ^
-                        --virtual-time-budget=30000 ^
+                        --disable-extensions ^
+                        --no-first-run ^
+                        --no-default-browser-check ^
+                        --virtual-time-budget=60000 ^
                         --run-all-compositor-stages-before-draw ^
                         --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
                         "file:///%WORKSPACE%/%ALLURE_REPORT%/index.html"
 
                     if errorlevel 1 (
-                        echo ERROR: Chrome PDF generation command failed
+                        echo ERROR: Chrome PDF generation failed.
                         exit /b 1
                     )
 
-
-                    // ------------------------------------------------
-                    // Verify PDF
-                    // ------------------------------------------------
-                    echo.
-                    echo Checking generated PDF...
-
-                    if not exist "%WORKSPACE%\\%PDF_NAME%" (
-                        echo ERROR: Allure PDF was not generated
+                    if not exist "%PDF_NAME%" (
+                        echo ERROR: PDF was not generated.
                         exit /b 1
                     )
 
-                    echo.
-                    echo ========================================
-                    echo PDF GENERATED SUCCESSFULLY
-                    echo ========================================
-
-                    dir "%WORKSPACE%\\%PDF_NAME%"
+                    echo Allure PDF generated successfully.
                 '''
             }
         }
 
 
         // ============================================================
-        // 7. FINAL REPORT CHECK
+        // 7. FINAL VERIFICATION
         // ============================================================
-        stage('Final Report Check') {
+        stage('Verify Reports') {
             steps {
                 bat '''
-                    echo ========================================
-                    echo FINAL REPORT CHECK
-                    echo ========================================
+                    if not exist "%PDF_NAME%" (
+                        echo ERROR: Allure PDF not found.
+                        exit /b 1
+                    )
 
-                    echo.
-                    echo Allure PDF:
-                    if exist "%WORKSPACE%\\%PDF_NAME%" (
-                        echo FOUND - %WORKSPACE%\\%PDF_NAME%
-                        dir "%WORKSPACE%\\%PDF_NAME%"
-                    ) else (
-                        echo NOT FOUND
+                    if not exist "%CUCUMBER_REPORT%" (
+                        echo ERROR: Cucumber report not found.
+                        exit /b 1
                     )
 
                     echo.
-                    echo Cucumber HTML:
-                    if exist "%WORKSPACE%\\%CUCUMBER_REPORT%" (
-                        echo FOUND - %WORKSPACE%\\%CUCUMBER_REPORT%
-                        dir "%WORKSPACE%\\%CUCUMBER_REPORT%"
-                    ) else (
-                        echo NOT FOUND
-                    )
-
-                    echo.
-                    echo ========================================
-                    echo REPORT CHECK COMPLETED
-                    echo ========================================
+                    echo Reports generated successfully.
+                    echo Allure PDF     : %PDF_NAME%
+                    echo Cucumber Report : %CUCUMBER_REPORT%
                 '''
             }
         }
@@ -327,106 +200,44 @@ pipeline {
 
         always {
 
-            echo 'CI/CD execution completed'
-
-
-            // --------------------------------------------------------
-            // Archive Allure PDF + Cucumber HTML
-            // --------------------------------------------------------
             archiveArtifacts(
                 artifacts: "${PDF_NAME},${CUCUMBER_REPORT}",
                 allowEmptyArchive: true
             )
 
-
-            // --------------------------------------------------------
-            // Send Email
-            // --------------------------------------------------------
             emailext(
                 to: 'vasanthvj.kiaq@gmail.com',
-
                 subject: "[CI/CD] Pipeline1 - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
-
                 body: """
 Hi Team,
 
 The CI/CD pipeline execution has completed.
 
-========================================
-BUILD DETAILS
-========================================
+Build Number : #${env.BUILD_NUMBER}
+Build Status : ${currentBuild.currentResult}
 
-Project        : Pipeline1
-Build Number   : #${env.BUILD_NUMBER}
-Build Status   : ${currentBuild.currentResult}
-
-========================================
-TEST REPORTS
-========================================
-
-Allure Report:
-Allure-Report.pdf
-
-Cucumber Report:
-CucumberReport.html
-
-The Allure PDF contains the detailed Allure test execution results.
-
-The Cucumber HTML report contains the detailed Cucumber execution results.
-
-The Jenkins build log is also attached for reference.
-
-========================================
-REPORT LOCATIONS
-========================================
-
-Allure PDF:
-${PDF_NAME}
-
-Cucumber HTML:
-${CUCUMBER_REPORT}
-
-========================================
+Reports:
+- Allure PDF: ${PDF_NAME}
+- Cucumber HTML: ${CUCUMBER_REPORT}
 
 Regards,
-
 Automation Team
 """,
-
                 attachmentsPattern: "${PDF_NAME},${CUCUMBER_REPORT}",
-
                 attachLog: true
             )
         }
 
-
-        // ------------------------------------------------------------
-        // SUCCESS
-        // ------------------------------------------------------------
         success {
-            echo '========================================'
-            echo 'BUILD AND TESTS PASSED SUCCESSFULLY'
-            echo '========================================'
+            echo 'Build and tests passed successfully.'
         }
 
-
-        // ------------------------------------------------------------
-        // FAILURE
-        // ------------------------------------------------------------
         failure {
-            echo '========================================'
-            echo 'BUILD OR TESTS FAILED'
-            echo '========================================'
+            echo 'Build or tests failed.'
         }
 
-
-        // ------------------------------------------------------------
-        // UNSTABLE
-        // ------------------------------------------------------------
         unstable {
-            echo '========================================'
-            echo 'BUILD IS UNSTABLE'
-            echo '========================================'
+            echo 'Build is unstable.'
         }
     }
 }
