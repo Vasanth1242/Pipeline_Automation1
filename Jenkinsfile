@@ -176,7 +176,9 @@ pipeline {
             )
 
             emailext(
-                to: 'vasanthvj.kiaq@gmail.com, bharathkumar.kiaq@gmail.com',
+                to: 'vasanthvj.kiaq@gmail.com',
+                cc: 'bharathkumar.kiaq@gmail.com',
+                bcc: 'selvaganapathy.kiaq@gmail.com',
                 subject: "[CI/CD] Pipeline1 - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
                 body: """
 Hi Team,
@@ -191,7 +193,7 @@ Reports:
 - Cucumber HTML: ${CUCUMBER_REPORT}
 
 Regards,
-Automation Team
+Web Automation Team
 """,
                 attachmentsPattern: "${PDF_NAME},${CUCUMBER_REPORT}",
                 attachLog: true
