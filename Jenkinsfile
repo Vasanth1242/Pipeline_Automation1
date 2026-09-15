@@ -177,8 +177,6 @@ pipeline {
 
             emailext(
                 to: 'vasanthvj.kiaq@gmail.com',
-                cc: 'bharathkumar.kiaq@gmail.com',
-                bcc: 'selvaganapathy.kiaq@gmail.com',
                 subject: "[CI/CD] Pipeline1 - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
                 body: """
 Hi Team,
@@ -197,6 +195,17 @@ Web Automation Team
 """,
                 attachmentsPattern: "${PDF_NAME},${CUCUMBER_REPORT}",
                 attachLog: true
+                
+                presendScript: '''
+                msg.addRecipients(
+					jakarta.mail.Message.RecipientType.CC,
+					"bharathkumar.kiaq@gmail.com"
+				)
+				 msg.addRecipients(
+					jakarta.mail.Message.RecipientType.BCC,
+					"selvaganapathy.kiaq@gmail.com"
+				)
+			'''	
             )
         }
 
