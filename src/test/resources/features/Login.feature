@@ -8,5 +8,6 @@ Feature: User Login
     Then login should be "<result>"
 
     Examples:
-      | username      | password     | result |
-      | standard_user | secret_sauce | Valid  |
+      | username      | password     | result  |
+      | standard_user | secret       | Invalid |
+      | standard_user | secret_sauce | Valid   |
