@@ -46,8 +46,6 @@ public class CommonUtilities {
 			byte[] screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
 			String screenshotName = "Step Passed -" + stepName;
 			scenario.attach(screenshot, "image/png", screenshotName);
-			// Allure.addAttachment(screenshotName, stepName, new
-			// ByteArrayInputStream(screenshot), screenshotName);
 			System.out.println("Screenshot attached to Cucumber report: " + screenshotName);
 		} catch (Exception e) {
 			System.out.println("Screenshot failed: " + e.getMessage());
