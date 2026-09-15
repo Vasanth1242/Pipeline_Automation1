@@ -79,11 +79,10 @@ pipeline {
 
 
         // ============================================================
-        // 5. VERIFY & PUBLISH CUCUMBER REPORT
+        // 5. VERIFY CUCUMBER REPORT
         // ============================================================
-        stage('Cucumber Report') {
+        stage('Verify Cucumber') {
             steps {
-
                 bat '''
                     if not exist "%CUCUMBER_REPORT%" (
                         echo ERROR: Cucumber report not found.
@@ -92,16 +91,6 @@ pipeline {
 
                     echo Cucumber report verified.
                 '''
-
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'target',
-                    reportFiles: 'CucumberReport.html',
-                    reportName: 'Cucumber HTML Report',
-                    reportTitles: 'Cucumber Test Report'
-                ])
             }
         }
 
@@ -109,68 +98,70 @@ pipeline {
         // ============================================================
         // 6. GENERATE ALLURE PDF
         // ============================================================
-        stage('Generate PDF') {
-            steps {
-                bat '''
-                    set "CHROME="
+       stage('Generate PDF') {
+    steps {
+        bat '''
+            set "CHROME="
 
-                    if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
-                        set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-                    ) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
-                        set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-                    )
+            if exist "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" (
+                set "CHROME=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+            ) else if exist "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe" (
+                set "CHROME=C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+            )
 
-                    if "%CHROME%"=="" (
-                        echo ERROR: Google Chrome not found.
-                        exit /b 1
-                    )
+            if "%CHROME%"=="" (
+                echo ERROR: Google Chrome not found.
+                exit /b 1
+            )
 
-                    if not exist "%ALLURE_REPORT%\\index.html" (
-                        echo ERROR: Allure report was not generated.
-                        exit /b 1
-                    )
+            if not exist "%ALLURE_REPORT%\\index.html" (
+                echo ERROR: Allure report was not generated.
+                exit /b 1
+            )
 
-                    echo Allure report is ready.
-                    echo Waiting for report files to settle...
+            echo Allure report is ready.
+            echo Waiting for report files to settle...
 
-                    timeout /t 3 /nobreak >nul
+            timeout /t 3 /nobreak >nul
 
-                    if exist "%PDF_NAME%" (
-                        del /f /q "%PDF_NAME%"
-                    )
+            if exist "%PDF_NAME%" (
+                del /f /q "%PDF_NAME%"
+            )
 
-                    echo Generating Allure PDF...
+            echo Generating Allure PDF...
 
-                    "%CHROME%" ^
-                        --headless=new ^
-                        --no-sandbox ^
-                        --disable-gpu ^
-                        --disable-dev-shm-usage ^
-                        --allow-file-access-from-files ^
-                        --disable-web-security ^
-                        --disable-extensions ^
-                        --no-first-run ^
-                        --no-default-browser-check ^
-                        --virtual-time-budget=60000 ^
-                        --run-all-compositor-stages-before-draw ^
-                        --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
-                        "file:///%WORKSPACE%/%ALLURE_REPORT%/index.html"
+            "%CHROME%" ^
+                --headless=new ^
+                --no-sandbox ^
+                --disable-gpu ^
+                --disable-dev-shm-usage ^
+                --allow-file-access-from-files ^
+                --disable-web-security ^
+                --disable-extensions ^
+                --no-first-run ^
+                --no-default-browser-check ^
+                --virtual-time-budget=60000 ^
+                --run-all-compositor-stages-before-draw ^
+                --print-to-pdf="%WORKSPACE%\\%PDF_NAME%" ^
+                "file:///%WORKSPACE%/%ALLURE_REPORT%/index.html"
 
-                    if errorlevel 1 (
-                        echo ERROR: Chrome PDF generation failed.
-                        exit /b 1
-                    )
+            if errorlevel 1 (
+                echo ERROR: Chrome PDF generation failed.
+                exit /b 1
+            )
 
-                    if not exist "%PDF_NAME%" (
-                        echo ERROR: Allure PDF was not generated.
-                        exit /b 1
-                    )
+            if not exist "%PDF_NAME%" (
+                echo ERROR: Allure PDF was not generated.
+                exit /b 1
+            )
 
-                    echo Allure PDF generated successfully.
-                    dir "%PDF_NAME%"
-                '''
-            }
-        }
+            echo Allure PDF generated successfully.
+            dir "%PDF_NAME%"
+        '''
+    }
+}
+             
+      
 
 
         // ============================================================
@@ -206,7 +197,6 @@ pipeline {
 
         always {
 
-            // Keep both reports available as Jenkins build artifacts
             archiveArtifacts(
                 artifacts: "${PDF_NAME},${CUCUMBER_REPORT}",
                 allowEmptyArchive: true
@@ -224,15 +214,13 @@ Build Number : #${env.BUILD_NUMBER}
 Build Status : ${currentBuild.currentResult}
 
 Reports:
-
 - Allure PDF: ${PDF_NAME}
-- Cucumber HTML Report:
-  ${env.BUILD_URL}Cucumber_20HTML_20Report/
+- Cucumber HTML: ${CUCUMBER_REPORT}
 
 Regards,
 Automation Team
 """,
-                attachmentsPattern: "${PDF_NAME}",
+                attachmentsPattern: "${PDF_NAME},${CUCUMBER_REPORT}",
                 attachLog: true
             )
         }
